@@ -44,7 +44,7 @@ Optionally, display a confusion matrix or sample predictions.
 ## PROGRAM
 
 ```
-import torch
+import torch as t
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
@@ -52,126 +52,130 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import confusion_matrix, classification_report
 import seaborn as sns
+from sklearn.metrics import confusion_matrix, classification_report
 
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,))
-])
+transform=transforms.Compose([transforms.ToTensor(),transforms.Normalize((0.5,),(0.5,))])
+train_dataset=torchvision.datasets.MNIST(root='./data',train=True,download=True,transform=transform)
+test_dataset=torchvision.datasets.MNIST(root='./data',train=False,download=True,transform=transform)
 
+image,label=train_dataset[0]
+print("Image shape:",image.shape)
+print("Number of training samples:",len(train_dataset))
 
-train_dataset = torchvision.datasets.FashionMNIST(root="./data", train=True, transform=transform, download=True)
-test_dataset = torchvision.datasets.FashionMNIST(root="./data", train=False, transform=transform, download=True)
-
-image, label = train_dataset[0]
-print(image.shape)
-print(len(train_dataset))
-
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+image,label=test_dataset[0]
+print("Image shape:",image.shape)
+print("Number of testing samples:",len(test_dataset))
+train_loader=DataLoader(train_dataset,batch_size=32,shuffle=True)
+test_loader=DataLoader(test_dataset,batch_size=32,shuffle=False)
 
 class CNNClassifier(nn.Module):
-    def __init__(self):
-        super(CNNClassifier, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.fc1 = nn.Linear(128 * 3 * 3, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 10)
+  def __init__(self):
+    super(CNNClassifier,self).__init__()
+    self.conv1=nn.Conv2d(in_channels=1,out_channels=32,kernel_size=3,padding=1)
+    self.conv2=nn.Conv2d(in_channels=32,out_channels=64,kernel_size=3,padding=1)
+    self.conv3=nn.Conv2d(in_channels=64,out_channels=128,kernel_size=3,padding=1)
+    self.pool=nn.MaxPool2d(kernel_size=2,stride=2)
+    self.fc1=nn.Linear(128*3*3,128)
+    self.fc2=nn.Linear(128,64)
+    self.fc3=nn.Linear(64,10)
 
-    def forward(self, x):
-        x = self.pool(torch.relu(self.conv1(x)))
-        x = self.pool(torch.relu(self.conv2(x)))
-        x = self.pool(torch.relu(self.conv3(x)))
-        x = x.view(x.size(0), -1)
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+  def forward(self,x):
+    x=self.pool(t.relu(self.conv1(x)))
+    x=self.pool(t.relu(self.conv2(x)))
+    x=self.pool(t.relu(self.conv3(x)))
+    x=x.view(x.size(0),-1)
+    x=nn.functional.relu(self.fc1(x))
+    x=nn.functional.relu(self.fc2(x))
+    x=self.fc3(x)
+    return x
 
-model =CNNClassifier()
-criterion =nn.CrossEntropyLoss()
-optimizer =optim.Adam(model.parameters(),lr=0.001)
-
-def train_model(model, train_loader, num_epochs=3):
+from torchsummary import summary
+model=CNNClassifier()
+if t.cuda.is_available():
+  device=t.device("cuda")
+  model.to(device)
+print("Name: HARISHA.S")
+print("Reg.no: 212224230087")
+summary(model,input_size=(1,28,28))
+criterion=nn.CrossEntropyLoss()
+optimizer=optim.Adam(model.parameters(),lr=0.001)
+def train_model(model,train_loader,num_epochs):
   for epoch in range(num_epochs):
-        model.train()
-        running_loss = 0.0
-        for images, labels in train_loader:
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
+    model.train()
+    running_loss=0.0
+    for images,labels in train_loader:
+      if t.cuda.is_available():
+        images,labels=images.to(device),labels.to(device)
+      optimizer.zero_grad()
+      outputs=model(images)
+      loss=criterion(outputs,labels)
+      loss.backward()
+      optimizer.step()
+      running_loss+=loss.item()
+    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}")
+print("Name: HARISHA.S")
+print("Reg.no: 212224230087")
 
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}')
-
-train_model(model, train_loader)
+train_model(model,train_loader,num_epochs=10)
 
 def test_model(model, test_loader):
-    model.eval()
-    correct = 0
-    total = 0
-    all_preds = []
-    all_labels = []
+  model.eval()
+  correct = 0
+  total = 0
+  all_preds = []
+  all_labels = []
+  with t.no_grad():
+    for images, labels in test_loader:
+      if t.cuda.is_available():
+        images, labels = images.to(device), labels.to(device)
 
-    with torch.no_grad():
-        for images, labels in test_loader:
-            outputs = model(images)
-            _, predicted = torch.max(outputs, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-            all_preds.extend(predicted.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
+      outputs = model(images)
+      _, predicted = t.max(outputs, 1)
+      total += labels.size(0)
+      correct += (predicted == labels).sum().item()
+      all_preds.extend(predicted.cpu().numpy())
+      all_labels.extend(labels.cpu().numpy())
 
-    accuracy = correct / total
-    print('Name: DEETCHANA S')
-    print('Register Number: 212224220021')
-    print(f'Test Accuracy: {accuracy:.4f}')
+  accuracy = correct/total
+  print("Name: HARISHA.S")
+  print("Reg.no: 212224230087")
+  print(f"Test Accuracy: {accuracy:.4f}")
 
-    # Compute confusion matrix
-    cm = confusion_matrix(all_labels, all_preds)
-    plt.figure(figsize=(8, 6))
-    print('Name: DEETCHANA S')
-    print('Register Number: 212224220021')
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=test_dataset.classes, yticklabels=test_dataset.classes)
-    plt.xlabel('Predicted')
-    plt.ylabel('Actual')
-    plt.title('Confusion Matrix')
-    plt.show()
+  cm = confusion_matrix(all_labels, all_preds)
+  plt.figure(figsize=(8, 6))
+  print("Name: HARISHA.S")
+  print("Reg.no: 212224230087")
+  sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=test_dataset.classes, yticklabels=test_dataset.classes)
+  plt.xlabel("Predicted")
+  plt.ylabel("Actual")
+  plt.title("Confusion Matrix")
+  plt.show()
 
-    # Print classification report
-    print('Name: DEETCHANA S')
-    print('Register Number: 212224220021')
-    print("Classification Report:")
-    print(classification_report(all_labels, all_preds, target_names=test_dataset.classes))
+  print("Name: HARISHA.S")
+  print("Reg.no: 212224230087")
+  print("Classification Report:")
+  print(classification_report(all_labels, all_preds, target_names=[str(i) for i in range(10)]))
+test_model(model, test_loader)
 
-test_model(model,test_loader)
+def predict_image(model,image_index,dataset):
+  model.eval()
+  image,label=dataset[image_index]
+  if t.cuda.is_available():
+    image=image.to(device)
 
-import matplotlib.pyplot as plt
-def predict_image(model, image_index, dataset):
-    model.eval()
-    image, label = dataset[image_index]
-    with torch.no_grad():
-        output = model(image.unsqueeze(0))  # Add batch dimension
-        _, predicted = torch.max(output, 1)
-    class_names = dataset.classes
-
-    # Display the image
-    print('Name: DEETCHANA S')
-    print('Register Number: 212224220021')
-    plt.imshow(image.squeeze(), cmap="gray")
-    plt.title(f'Actual: {class_names[label]}\nPredicted: {class_names[predicted.item()]}')
-    plt.axis("off")
-    plt.show()
-    print(f'Actual: {class_names[label]}, Predicted: {class_names[predicted.item()]}')
-
-
-predict_image(model, image_index=80, dataset=test_dataset)
+  with t.no_grad():
+    output=model(image.unsqueeze(0))
+    _,predicted=t.max(output,1)
+  class_names=[str(i) for i in range(10)]
+  print("Name: HARISHA.S")
+  print("Reg.no: 212224230087")
+  plt.imshow(image.cpu().squeeze(0),cmap='gray')
+  plt.title(f"Actual: {class_names[label]}\nPredicted: {class_names[predicted.item()]}")
+  plt.axis("off")
+  plt.show()
+  print(f"Actual: {class_names[label]}\nPredicted: {class_names[predicted.item()]}")
+predict_image(model,image_index=80,dataset=test_dataset)
 ```
 
 ### Name: DEETCHANA S
@@ -181,21 +185,22 @@ predict_image(model, image_index=80, dataset=test_dataset)
 ### OUTPUT
 
 ## Training Loss per Epoch
-<img width="330" height="92" alt="image" src="https://github.com/user-attachments/assets/4f1b0b4e-a834-4258-aab4-644eaafb8bfd" />
-
+<img width="785" height="792" alt="image" src="https://github.com/user-attachments/assets/c282c336-ea0d-4e0c-b2ea-c9de572986fa" />
 
 
 ## Confusion Matrix
-<img width="948" height="849" alt="image" src="https://github.com/user-attachments/assets/d4dc8ac0-e455-425f-bc79-f00b7138b2cb" />
+<img width="1017" height="803" alt="image" src="https://github.com/user-attachments/assets/6a242f61-f51d-4343-bc91-f1a76453a591" />
+
 
 
 ## Classification Report
-<img width="630" height="452" alt="image" src="https://github.com/user-attachments/assets/e603f629-8b46-47b4-b01f-c74561ef68bb" />
+<img width="701" height="445" alt="image" src="https://github.com/user-attachments/assets/0a1373b1-6d28-4e8e-93cb-8c84055fb656" />
+
 
 
 
 ### New Sample Data Prediction
-<img width="624" height="647" alt="image" src="https://github.com/user-attachments/assets/9be7324e-59dc-4bc0-907b-a6a611aa56ac" />
+<img width="677" height="646" alt="image" src="https://github.com/user-attachments/assets/05cce439-2e14-46e1-be93-06e1a121abb1" />
 
 
 
